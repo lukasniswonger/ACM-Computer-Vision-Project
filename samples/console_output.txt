@@ -1,0 +1,26 @@
+[  0.20s] enter Card #1
+[  1.33s] enter Tow- #2
+[  1.53s] enter Key #3
+[  2.13s] enter Tow- #4
+[  2.13s] exit  Tow- #2 (1.1s on screen)
+[  2.27s] exit  Key #3 (1.03s on screen)
+[  3.87s] exit  Tow- #4 (1.37s on screen)
+[  3.93s] exit  Card #1 (3.37s on screen)
+[  4.40s] enter Card #9
+[  6.07s] exit  Card #9 (1.3s on screen)
+[ 11.27s] enter Mary #20
+[ 13.27s] enter Fob #21
+[ 14.67s] enter Mary #22
+[ 14.67s] exit  Fob #21 (1.03s on screen)
+[ 15.20s] exit  Mary #20 (3.57s on screen)
+[ 18.33s] exit  Mary #22 (3.5s on screen)
+[ 25.87s] enter Mary #28
+[ 27.73s] exit  Mary #28 (1.7s on screen)
+
+Summary of 28.4s of video
+class                appearances   seconds on screen
+Card                           2                 4.7
+Fob                            1                 1.0
+Key                            1                 1.0
+Mary                           3                 8.8
+Tow-                           2                 2.5

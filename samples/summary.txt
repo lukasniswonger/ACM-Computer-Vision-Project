@@ -1,0 +1,7 @@
+Summary of 28.4s of video
+class                appearances   seconds on screen
+Card                           2                 4.7
+Fob                            1                 1.0
+Key                            1                 1.0
+Mary                           3                 8.8
+Tow-                           2                 2.5
