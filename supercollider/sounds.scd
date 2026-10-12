@@ -3,7 +3,7 @@
 // Every sound is built from short grains (GrainSin / GrainFM).
 
 // Class ids in model/classes.txt order: Card, Tow-, cotwo, Saint Christopher, Mary, Fob, Key
-// MIDI notes from C major pentatonic, so any combination of objects sounds consonant
+// Low MIDI base notes, one semitone apart (class id indexes into this list)
 ~notes = [21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35];
 
 ~defs = [

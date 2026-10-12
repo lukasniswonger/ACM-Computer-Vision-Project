@@ -1,5 +1,7 @@
 # Object Sonifier
 
+Objects detected in this video instigate sound output from a supercollider program. Each object in the video (road side assistance card, car key, fob, keychain saints) are assigned a note, which is played in a cloud of granular synth sounds when the assosiated object appears. 
+
 Detects the things in my pocket (a roadside-assistance card, its phone number, my car key, key fob, and two keychain medals) in a recorded video, tracks them as they come and go, and **turns them into sound with SuperCollider using only granular synthesis**: each object type gets its own note, a burst of grains marks its arrival, and a cloud of grains follows it around the stereo field while it stays on screen.
 
 ![Card, key and phone number detected](samples/screenshots/01_card_key_and_number.jpg)
@@ -31,6 +33,7 @@ None of these exist in standard pretrained datasets (COCO has no keys, cards or 
 - **YOLOv8n (nano), fine-tuned** with Ultralytics on Google Colab's free GPU ([training/fine_tune_yolo.ipynb](training/fine_tune_yolo.ipynb)). Fine-tuning from COCO weights learns new classes from very little data. Here, 68 labeled frames.
 - **Nano** because inference runs on a 2019 Intel MacBook Pro CPU. Larger models would be too slow for playback.
 - **Exported to ONNX and run with OpenCV's `cv2.dnn`**, so running the project needs only OpenCV and NumPy, not PyTorch. (PyTorch no longer ships builds for Intel Macs on Python 3.13.)
+- **Exported to ONNX and run with OpenCV's `cv2.dnn`**, so running the project needs only OpenCV and NumPy.
 
 Training data: 853 frames were extracted from the video, 68 were labeled in [makesense.ai](https://www.makesense.ai) (labels in [labels/](labels/)), and split 56 train / 12 validation by video section rather than at random, so near-identical neighboring frames don't make the validation score look better than it is.
 
@@ -48,6 +51,7 @@ video frame ─► detector.py ─► tracker.py ─► enter / exit events ─�
 3. **Track** ([tracker.py](tracker.py)): each detection is matched to the nearest existing track of the same class. A track is **confirmed** after 4 matches, which filters out one-off false positives, and **removed** after 8 detection runs without a match, which rides out brief motion blur. Confirming produces an `enter` event; removing a confirmed track produces an `exit` event.
 4. **Act on events** ([main.py](main.py)): log them, save a crop, send OSC, and draw the result.
 5. **No detections** are a normal case: the detector returns an empty list, the corner panel shows *"No objects detected"*, and the summary says *"No objects were detected."* if nothing ever appears (covered by [tests/test_no_detections.py](tests/test_no_detections.py)).
+5. **No detections** : the detector returns an empty list, the corner panel shows *"No objects detected"*, and the summary says *"No objects were detected."* if nothing ever appears (covered by [tests/test_no_detections.py](tests/test_no_detections.py)).
 
 ## Custom behavior
 

@@ -5,7 +5,7 @@
 //   Terminal:          /Applications/SuperCollider.app/Contents/MacOS/sclang supercollider/sonify.scd
 //
 // The sounds themselves are defined in sounds.scd. Every class has its own note.
-//   appears:   a burst of sine grains at the object's note, dense at first and thinning out
+//   appears:   a burst of sine grains above the object's note, with a steeply climbing pitch
 //   on screen: a continuous cloud of FM grains that follows the object:
 //              x position -> where grains land in the stereo field
 //              size       -> grain density and volume (closer = thicker cloud)
