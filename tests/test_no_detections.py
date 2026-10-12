@@ -31,8 +31,8 @@ def test_empty_frame():
         assert tracker.update(detections, i, (1920, 1080)) == []
     assert tracker.flush(20) == []
 
+    draw_hud(frame, tracker.confirmed_tracks, [])
     draw_tracks(frame, tracker.confirmed_tracks)
-    draw_hud(frame, tracker.confirmed_tracks, [], 0.0, 0.0)
     print("ok: empty frame -> no detections, no events, HUD draws")
 
 

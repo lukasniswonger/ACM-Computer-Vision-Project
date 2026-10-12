@@ -12,6 +12,7 @@ from collections import defaultdict
 import cv2
 
 from detector import Detector
+from preview import build_preview
 from sonify import Sonifier
 from tracker import Tracker
 
@@ -24,7 +25,7 @@ COLORS = [(80, 200, 80), (0, 200, 255), (255, 160, 0), (200, 80, 255), (255, 255
 
 def parse_args():
     p = argparse.ArgumentParser(description="Detect objects in a video and sonify them with SuperCollider.")
-    p.add_argument("--video", default=os.path.join(HERE, "videos", "demo.mov"), help="input video file")
+    p.add_argument("--video", default=os.path.join(HERE, "videos", "demo_detected.mp4"), help="input video file")
     p.add_argument("--model", default=os.path.join(HERE, "model", "best.onnx"))
     p.add_argument("--classes", default=os.path.join(HERE, "model", "classes.txt"))
     p.add_argument("--conf", type=float, default=0.5, help="confidence threshold (default 0.5)")
@@ -35,6 +36,10 @@ def parse_args():
     p.add_argument("--no-audio", action="store_true", help="don't send OSC messages to SuperCollider")
     p.add_argument("--osc-host", default="127.0.0.1")
     p.add_argument("--osc-port", type=int, default=57120, help="port sclang listens on (default 57120)")
+    p.add_argument("--render-preview", action="store_true",
+                   help="also make output/preview.mp4: the annotated video with the sonification rendered in sync")
+    p.add_argument("--sclang", default=None, help="path to sclang, for --render-preview")
+    p.add_argument("--ffmpeg", default=None, help="path to ffmpeg, for --render-preview")
     return p.parse_args()
 
 
@@ -59,38 +64,39 @@ def draw_tracks(frame, tracks):
         draw_label(frame, f"{t.class_name} #{t.track_id} {t.confidence:.2f}", left, top - 2, color)
 
 
-def draw_hud(frame, tracks, recent_events, video_time, fps):
-    """Panel in the top-left corner: what's on screen right now and the latest events."""
+def draw_hud(frame, tracks, recent_events):
+    """Small panel in the top-left corner: what's on screen right now and the latest events."""
     counts = defaultdict(int)
     for t in tracks:
         counts[t.class_name] += 1
 
-    lines = [(f"t = {video_time:5.1f}s   {fps:4.1f} fps", (255, 255, 255))]
     if counts:
-        lines.append((f"On screen: {sum(counts.values())}", (255, 255, 255)))
-        lines += [(f"  {name} x{n}", (200, 200, 200)) for name, n in sorted(counts.items())]
+        lines = [("  ".join(f"{name} x{n}" for name, n in sorted(counts.items())), (255, 255, 255))]
     else:
-        lines.append(("No objects detected", (120, 120, 255)))
-    if recent_events:
-        lines.append(("Events:", (255, 255, 255)))
-        lines += [(e, (200, 200, 200)) for e in recent_events]
+        lines = [("No objects detected", (120, 120, 255))]
+    lines += [(e, (190, 190, 190)) for e in recent_events]
 
-    line_h, pad = 44, 14
-    panel_w, panel_h = 560, pad * 2 + line_h * len(lines)
+    font, scale, thickness = cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2
+    line_h, pad = 28, 10
+    panel_w = pad * 2 + max(cv2.getTextSize(text, font, scale, thickness)[0][0] for text, _ in lines)
+    panel_h = pad * 2 + line_h * len(lines)
     frame[:panel_h, :panel_w] //= 3  # darken the corner so text stays readable
     for i, (text, color) in enumerate(lines):
-        y = pad + line_h * (i + 1) - 10
-        cv2.putText(frame, text, (pad, y), cv2.FONT_HERSHEY_SIMPLEX, 1.1, color, 2, cv2.LINE_AA)
+        y = pad + line_h * (i + 1) - 8
+        cv2.putText(frame, text, (pad, y), font, scale, color, thickness, cv2.LINE_AA)
 
 
 def open_video_writer(output_dir, fps, frame_size):
-    """H.264 .mp4 if this OpenCV build supports it, otherwise Motion-JPEG .avi."""
+    """H.264 .mp4 if this OpenCV build supports it, otherwise Motion-JPEG .avi. Returns (writer, path)."""
     for filename, codec in [("annotated.mp4", "avc1"), ("annotated.avi", "MJPG")]:
-        writer = cv2.VideoWriter(os.path.join(output_dir, filename), cv2.VideoWriter_fourcc(*codec), fps, frame_size)
+        path = os.path.join(output_dir, filename)
+        if os.path.exists(path):
+            os.remove(path)  # macOS's H.264 writer won't overwrite an existing file
+        writer = cv2.VideoWriter(path, cv2.VideoWriter_fourcc(*codec), fps, frame_size)
         if writer.isOpened():
-            return writer
+            return writer, path
     print("Warning: no supported video codec found, the annotated video will not be saved")
-    return None
+    return None, None
 
 
 def main():
@@ -104,7 +110,10 @@ def main():
 
     detector = Detector(args.model, args.classes, conf_threshold=args.conf)
     tracker = Tracker()
-    sonifier = None if args.no_audio else Sonifier(args.osc_host, args.osc_port)
+    # The preview needs the OSC messages recorded even when nothing is listening live
+    sonifier = None
+    if not args.no_audio or args.render_preview:
+        sonifier = Sonifier(args.osc_host, args.osc_port, send=not args.no_audio)
 
     crops_dir = os.path.join(args.output, "crops")
     os.makedirs(crops_dir, exist_ok=True)
@@ -112,9 +121,9 @@ def main():
     log = csv.writer(log_file)
     log.writerow(["time_s", "frame", "event", "track_id", "class", "confidence", "x", "y", "w", "h", "seconds_on_screen"])
 
-    writer = None
-    if args.save_video:
-        writer = open_video_writer(args.output, fps, frame_size)
+    writer, video_out = None, None
+    if args.save_video or args.render_preview:
+        writer, video_out = open_video_writer(args.output, fps, frame_size)
 
     if not args.no_display:
         cv2.namedWindow(WINDOW, cv2.WINDOW_NORMAL)
@@ -145,13 +154,12 @@ def main():
             log.writerow([round(time_s, 2), e.frame_index, e.kind, t.track_id, t.class_name,
                           round(t.confidence, 3), left, top, w, h, seconds])
             sign = "+" if e.kind == "enter" else "-"
-            recent.append(f"{time_s:5.1f}s {sign} {t.class_name} #{t.track_id}")
-            del recent[:-4]
+            recent.append(f"{time_s:.1f}s {sign} {t.class_name} #{t.track_id}")
+            del recent[:-2]
             print(f"[{time_s:6.2f}s] {e.kind:5} {t.class_name} #{t.track_id}"
                   + (f" ({seconds}s on screen)" if seconds else ""))
 
     frame_index = 0
-    display_fps = 0.0
     try:
         while True:
             start = time.perf_counter()
@@ -159,6 +167,8 @@ def main():
             if not ret:
                 break
 
+            if sonifier:
+                sonifier.time = frame_index / fps
             if frame_index % args.detect_every == 0:
                 detections = detector.detect(frame)
                 handle(tracker.update(detections, frame_index, frame_size), frame)
@@ -166,7 +176,7 @@ def main():
                     sonifier.update(tracker.confirmed_tracks, frame_size)
 
             # HUD first so object labels stay visible when they overlap it
-            draw_hud(frame, tracker.confirmed_tracks, recent, frame_index / fps, display_fps)
+            draw_hud(frame, tracker.confirmed_tracks, recent)
             draw_tracks(frame, tracker.confirmed_tracks)
             if writer:
                 writer.write(frame)
@@ -179,9 +189,10 @@ def main():
                 if key in (ord("q"), 27) or cv2.getWindowProperty(WINDOW, cv2.WND_PROP_VISIBLE) < 1:
                     break
 
-            display_fps = 0.9 * display_fps + 0.1 / (time.perf_counter() - start)
             frame_index += 1
     finally:
+        if sonifier:
+            sonifier.time = frame_index / fps
         handle(tracker.flush(frame_index), None)
         if sonifier:
             sonifier.clear()
@@ -192,6 +203,10 @@ def main():
         cv2.destroyAllWindows()
 
     print_summary(totals, frame_index / fps, args.output)
+
+    if args.render_preview and video_out:
+        path = build_preview(sonifier.score, video_out, args.output, frame_index / fps, sclang=args.sclang, ffmpeg=args.ffmpeg)
+        print(f"Preview with sound: {path}")
 
 
 def print_summary(totals, duration, output_dir):

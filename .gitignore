@@ -14,6 +14,9 @@ keys_card_model/
 # Original recordings at the project root (the demo copy is videos/demo.mov)
 /*.mov
 
+# Local tool binaries (e.g. a downloaded ffmpeg)
+bin/
+
 __pycache__/
 .DS_Store
 .ipynb_checkpoints/
