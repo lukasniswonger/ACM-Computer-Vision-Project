@@ -1,6 +1,6 @@
 # Object Sonifier
 
-Objects detected in this video instigate sound output from a supercollider program. Each object in the video (road side assistance card, car key, fob, keychain saints) are assigned a note, which is played in a cloud of granular synth sounds when the assosiated object appears. 
+Objects detected in this video instigate sound output from a supercollider program. Each object in the video (road side assistance card, car key, fob, keychain saints) are assigned a note, which is played in a cloud of granular synth sounds when the associated object appears. 
 
 ![Card, key and phone number detected](samples/screenshots/01_card_key_and_number.jpg)
 
@@ -30,7 +30,6 @@ None of these exist in standard pretrained datasets (COCO has no keys, cards or 
 
 - **YOLOv8n (nano), fine-tuned** with Ultralytics on Google Colab's free GPU ([training/fine_tune_yolo.ipynb](training/fine_tune_yolo.ipynb)). Fine-tuning from COCO weights learns new classes from very little data. Here, 68 labeled frames.
 - **Nano** because inference runs on a 2019 Intel MacBook Pro CPU. Larger models would be too slow for playback.
-- **Exported to ONNX and run with OpenCV's `cv2.dnn`**, so running the project needs only OpenCV and NumPy, not PyTorch. (PyTorch no longer ships builds for Intel Macs on Python 3.13.)
 - **Exported to ONNX and run with OpenCV's `cv2.dnn`**, so running the project needs only OpenCV and NumPy.
 
 Training data: 853 frames were extracted from the video, 68 were labeled in [makesense.ai](https://www.makesense.ai) (labels in [labels/](labels/)), and split 56 train / 12 validation by video section rather than at random, so near-identical neighboring frames don't make the validation score look better than it is.
@@ -48,7 +47,6 @@ video frame ─► detector.py ─► tracker.py ─► enter / exit events ─�
 2. **Detect** ([detector.py](detector.py)): resize to 640×640 into a blob, run the network, and decode its `(1, 11, 8400)` output: 8400 candidate boxes, each with 4 box values and 7 class scores. The highest score is the class and confidence; candidates under 0.5 are dropped. Boxes are scaled back to frame pixels, and per-class non-max suppression (`NMSBoxesBatched`) removes duplicates. The decoding is vectorized with NumPy, which made it about 100× faster than a Python loop. The model runs on every 2nd frame (`--detect-every`), and the boxes carry over in between.
 3. **Track** ([tracker.py](tracker.py)): each detection is matched to the nearest existing track of the same class. A track is **confirmed** after 4 matches, which filters out one-off false positives, and **removed** after 8 detection runs without a match, which rides out brief motion blur. Confirming produces an `enter` event; removing a confirmed track produces an `exit` event.
 4. **Act on events** ([main.py](main.py)): log them, save a crop, send OSC, and draw the result.
-5. **No detections** are a normal case: the detector returns an empty list, the corner panel shows *"No objects detected"*, and the summary says *"No objects were detected."* if nothing ever appears (covered by [tests/test_no_detections.py](tests/test_no_detections.py)).
 5. **No detections** : the detector returns an empty list, the corner panel shows *"No objects detected"*, and the summary says *"No objects were detected."* if nothing ever appears (covered by [tests/test_no_detections.py](tests/test_no_detections.py)).
 
 ## Custom behavior
@@ -58,12 +56,12 @@ video frame ─► detector.py ─► tracker.py ─► enter / exit events ─�
 
 | Message | Sent when | Sound |
 |---|---|---|
-| `/detect/enter id class_id name x y size conf` | an object is confirmed | a burst of sine grains (`GrainSin`) at the object's note, dense at first and thinning out, panned to where it appeared; its grain cloud starts |
+| `/detect/enter id class_id name x y size conf` | an object is confirmed | a burst of sine grains (`GrainSin`) an octave above the object's note whose pitch climbs steeply and which keeps sounding (by design it doesn't decay); its grain cloud starts |
 | `/detect/update id x y size conf` | every detection run, for each tracked object | the FM grain cloud (`GrainFM`) follows the object: **x → where grains land in the stereo field, size → grain density and volume, height on screen → grain length and brightness** (higher = shorter, brighter grains) |
 | `/detect/exit id class_id name seconds` | an object leaves | a softer grain burst that slides down an octave, and its cloud fades out |
 | `/detect/clear` | the program ends | all clouds fade out |
 
-Each class has its own note from a C-major pentatonic scale (Card C4, Key D4, Saint Christopher E4, Mary G4, Fob G3, …), so any combination of objects is consonant, and you can tell which object entered just by listening. Every sound is made of short grains: there are no plain oscillators or filters.
+Each class has its own low base note, one semitone apart (Card A0 up to Key D#1), with grain pitches multiplied by random ratios chosen each time the sounds load, so every session sounds a little different. The mix is deliberately dense and overdriven: arrival bursts sustain and pile up, and the output clips. Every sound is made of short grains: there are no plain oscillators or filters. The sound design lives in [supercollider/sounds.scd](supercollider/sounds.scd); [sound.scd](sound.scd) is the same design as a standalone live script.
 
 ### 2. Tracking with IDs
 Objects keep an ID (`Key #3`) while they stay on screen. A thick box means the object was seen in the latest detection run; a thin box means it's briefly lost and being held at its last position.
@@ -78,8 +76,8 @@ Objects keep an ID (`Key #3`) while they stay on screen. A thick box means the o
 Tested on macOS 15 (Intel) with Python 3.13 and SuperCollider 3.14.
 
 ```bash
-git clone <repo-url>
-cd object-sonifier
+git clone https://github.com/lukasniswonger/ACM-Computer-Vision-Project.git
+cd ACM-Computer-Vision-Project
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
