@@ -2,8 +2,6 @@
 
 Objects detected in this video instigate sound output from a supercollider program. Each object in the video (road side assistance card, car key, fob, keychain saints) are assigned a note, which is played in a cloud of granular synth sounds when the assosiated object appears. 
 
-Detects the things in my pocket (a roadside-assistance card, its phone number, my car key, key fob, and two keychain medals) in a recorded video, tracks them as they come and go, and **turns them into sound with SuperCollider using only granular synthesis**: each object type gets its own note, a burst of grains marks its arrival, and a cloud of grains follows it around the stereo field while it stays on screen.
-
 ![Card, key and phone number detected](samples/screenshots/01_card_key_and_number.jpg)
 
 | Fob and Mary medal | Nothing detected |
